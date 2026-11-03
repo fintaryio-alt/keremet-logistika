@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Проверка тарифов доставки</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: одна колонка ~920px — шаги сверху вниз (калькулятор → все строки → чего нет), липкая панель ответа внизу. */
+:root {
+  --bg: #f3f4f1; --surface: #ffffff; --surface-2: #eef0ed; --border: #e1e5e0; --border-strong: #cdd3ce;
+  --text: #0f1a14; --text-2: #4a5650; --text-3: #66706a; --on-accent: #ffffff;
+  --accent: #035d33; --accent-hover: #047c44; --accent-soft: #e7f0ea;
+  --ok: #0e7b57; --ok-bg: #e3f5ee; --bad: #b42318; --bad-bg: #fdecea; --warn: #8a5a00; --warn-bg: #fdf3dc;
+  --font-ui: "Onest", -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-num: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0e1210; --surface: #161b18; --surface-2: #1d2420; --border: #2a332e; --border-strong: #3a453f;
+  --text: #edf1ee; --text-2: #a9b4ad; --text-3: #8a958e; --on-accent: #0a140f;
+  --accent: #35b67a; --accent-hover: #39c684; --accent-soft: #16301f;
+  --ok: #4ed0a0; --ok-bg: #153429; --bad: #ff8a80; --bad-bg: #3a1a17; --warn: #f2c35b; --warn-bg: #352a12;
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0e1210; --surface: #161b18; --surface-2: #1d2420; --border: #2a332e; --border-strong: #3a453f;
+  --text: #edf1ee; --text-2: #a9b4ad; --text-3: #8a958e; --on-accent: #0a140f;
+  --accent: #35b67a; --accent-hover: #39c684; --accent-soft: #16301f;
+  --ok: #4ed0a0; --ok-bg: #153429; --bad: #ff8a80; --bad-bg: #3a1a17; --warn: #f2c35b; --warn-bg: #352a12;
+  color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--text); font-family: var(--font-ui); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 920px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px 140px; display: grid; gap: 28px; }
+h1, h2, h3 { text-wrap: balance; margin: 0; line-height: 1.2; }
+h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: 20px; font-weight: 700; }
+h3 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3); }
+p { margin: 0; }
+.muted { color: var(--text-2); }
+.small { font-size: 13px; }
+.num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+.brand { font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--accent); }
+
+.head { display: grid; gap: 10px; }
+.steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 6px 0 0; padding: 0; list-style: none; counter-reset: s; }
+.steps li { counter-increment: s; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; font-size: 14px; color: var(--text-2); display: grid; gap: 4px; }
+.steps li::before { content: "Шаг " counter(s); font-size: 12px; font-weight: 700; color: var(--accent); letter-spacing: 0.04em; }
+.who { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.who label { font-weight: 600; }
+
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px; display: grid; gap: 16px; min-width: 0; }
+.sec-head { display: grid; gap: 4px; }
+
+.field { display: grid; gap: 6px; min-width: 0; }
+.field > span { font-size: 13px; font-weight: 600; color: var(--text-2); }
+select, input[type="text"], input[type="number"], textarea {
+  font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: 10px; padding: 9px 11px; width: 100%; min-width: 0; }
+textarea { resize: vertical; min-height: 64px; }
+select:focus-visible, input:focus-visible, textarea:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+
+.carriers { display: grid; gap: 8px; }
+.carrier { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; cursor: pointer; background: var(--surface); }
+.carrier:hover { border-color: var(--border-strong); }
+.carrier.on { border-color: var(--accent); background: var(--accent-soft); }
+.carrier input { accent-color: var(--accent); width: 18px; height: 18px; margin: 0; }
+.carrier .nm { font-weight: 600; }
+.carrier .price { text-align: right; white-space: nowrap; font-weight: 600; }
+.carrier .price small { display: block; font-family: var(--font-ui); font-weight: 400; font-size: 12px; color: var(--text-3); }
+
+.result { border-radius: 12px; background: var(--surface-2); padding: 16px; display: grid; gap: 10px; }
+.result .sum { font-size: 30px; font-weight: 600; letter-spacing: -0.01em; }
+.result .formula { color: var(--text-2); font-size: 14px; }
+.qty { display: grid; grid-template-columns: minmax(0, 220px); gap: 6px; }
+.empty { border: 1px dashed var(--border-strong); border-radius: 12px; padding: 16px; display: grid; gap: 10px; color: var(--text-2); }
+
+.chip { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.chip.warn { background: var(--warn-bg); color: var(--warn); }
+.chip.info { background: var(--accent-soft); color: var(--accent); }
+.chip.ok { background: var(--ok-bg); color: var(--ok); }
+.chip.bad { background: var(--bad-bg); color: var(--bad); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.btn { font: inherit; font-weight: 600; font-size: 14px; border-radius: 10px; padding: 8px 14px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); cursor: pointer; }
+.btn:hover { border-color: var(--text-3); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.btn.primary:hover { background: var(--accent-hover); }
+.btn.ok.on { background: var(--ok); border-color: var(--ok); color: var(--on-accent); }
+.btn.bad.on { background: var(--bad); border-color: var(--bad); color: var(--on-accent); }
+.btns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.filters { display: flex; gap: 6px; flex-wrap: wrap; }
+.filters button { font: inherit; font-size: 13px; font-weight: 600; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text-2); cursor: pointer; }
+.filters button.on { background: var(--text); color: var(--bg); border-color: var(--text); }
+
+.group { display: grid; gap: 8px; }
+.row { border: 1px solid var(--border); border-radius: 12px; padding: 14px; display: grid; gap: 10px; background: var(--surface); }
+.row.st-ok { border-color: var(--ok); }
+.row.st-bad { border-color: var(--bad); }
+.row-top { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: start; }
+.row .route { font-size: 13px; color: var(--text-3); }
+.row .nm { font-weight: 600; }
+.row .note { font-size: 13px; color: var(--text-2); }
+.row .price { text-align: right; font-weight: 600; white-space: nowrap; }
+.row .price small { display: block; font-family: var(--font-ui); font-weight: 400; font-size: 12px; color: var(--text-3); }
+
+.gap-item { display: grid; gap: 8px; padding: 14px; border: 1px solid var(--border); border-radius: 12px; }
+.gap-item .src { font-size: 13px; color: var(--text-2); }
+.gap-item .src b { color: var(--text); font-weight: 600; }
+
+.log { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.log li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: start; font-size: 14px; padding: 8px 10px; border-radius: 10px; background: var(--surface-2); }
+.log li button { font: inherit; font-size: 12px; color: var(--text-3); background: none; border: none; cursor: pointer; padding: 0; }
+
+.bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; background: var(--surface); border-top: 1px solid var(--border);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-top: 12px; padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+.bar-in { max-width: 920px; margin: 0 auto; display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.progress { display: grid; gap: 4px; min-width: 0; flex: 1 1 220px; }
+.track { height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; display: flex; }
+.track i { display: block; height: 100%; }
+.track .t-ok { background: var(--ok); }
+.track .t-bad { background: var(--bad); }
+.report { width: 100%; min-height: 180px; font-family: var(--font-num); font-size: 12px; }
+.toast { font-size: 13px; color: var(--ok); font-weight: 600; }
+
+@media (max-width: 640px) {
+  .steps, .grid3 { grid-template-columns: minmax(0, 1fr); }
+  h1 { font-size: 24px; }
+  .panel { padding: 16px; }
+  .result .sum { font-size: 26px; }
+}
+@media (prefers-reduced-motion: no-preference) { .carrier, .btn, .row { transition: border-color .15s, background-color .15s; } }
+</style>
+
+<div class="wrap">
+  <header class="head">
+    <div class="brand">КЕРЕМЕТ · ЗАЯВКИ И ОПЛАТЫ</div>
+    <h1>Проверка тарифов доставки</h1>
+    <p class="muted">Мы перенесли ваш Excel «Логистика Керемет Филиалдар» в CRM. Когда сотрудник создаёт заявку на перевозку, система сама считает сумму по этим тарифам. Больше лимита без объяснения заявку не пропустит. Проверьте, что всё перенесено правильно.</p>
+    <ol class="steps">
+      <li>Посчитайте в калькуляторе пару своих обычных перевозок. Совпадает с тем, сколько вы платите на самом деле?</li>
+      <li>Пройдите список всех тарифов. На каждой строке нажмите «Верно» или «Неверно» и напишите, как правильно.</li>
+      <li>Ответьте на вопросы внизу, нажмите «Скопировать ответ» и отправьте текст Зафару в WhatsApp.</li>
+    </ol>
+    <div class="who">
+      <label for="who">Кто проверяет:</label>
+      <input id="who" type="text" placeholder="Имя, город" style="max-width: 280px">
+    </div>
+  </header>
+
+  <section class="panel" aria-labelledby="calc-h">
+    <div class="sec-head">
+      <h2 id="calc-h">Калькулятор: как будет считать CRM</h2>
+      <p class="muted small">Тот же расчёт, что в заявке. Выберите груз и маршрут, затем перевозчика и количество.</p>
+    </div>
+    <div class="grid3">
+      <label class="field"><span>Что везём</span><select id="c-cargo"></select></label>
+      <label class="field"><span>Откуда</span><select id="c-from"></select></label>
+      <label class="field"><span>Куда</span><select id="c-to"></select></label>
+    </div>
+    <div id="c-body"></div>
+    <div id="c-log-wrap" hidden>
+      <h3>Записано в ответ</h3>
+      <ul class="log" id="c-log"></ul>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="list-h">
+    <div class="sec-head">
+      <h2 id="list-h">Все тарифы из Excel (<span id="total"></span>)</h2>
+      <p class="muted small">Строка с жёлтой пометкой значит, что в Excel не было написано, за что цена: за место, за кг или за машину. Мы поставили вариант, который подходит по сумме. Проверьте такие строки особенно внимательно.</p>
+    </div>
+    <div class="filters" id="filters" role="group" aria-label="Фильтр строк"></div>
+    <div id="list" class="group"></div>
+  </section>
+
+  <section class="panel" aria-labelledby="gaps-h">
+    <div class="sec-head">
+      <h2 id="gaps-h">В Excel есть, но в CRM мы не внесли</h2>
+      <p class="muted small">Здесь непонятно, что написано, или цена пустая. Подскажите, что имелось в виду. Если строка не нужна, так и напишите.</p>
+    </div>
+    <div id="gaps" class="group"></div>
+  </section>
+
+  <section class="panel" aria-labelledby="miss-h">
+    <div class="sec-head">
+      <h2 id="miss-h">Чего в Excel нет совсем</h2>
+      <p class="muted small">По этим перевозкам CRM сейчас не сможет посчитать сумму, и сотрудник введёт её вручную. Если вы так возите, напишите, кто везёт и сколько стоит.</p>
+    </div>
+    <div id="missing" class="group"></div>
+  </section>
+
+  <section class="panel" aria-labelledby="rep-h" id="rep-panel" hidden>
+    <div class="sec-head">
+      <h2 id="rep-h">Ваш ответ</h2>
+      <p class="muted small">Если кнопка не скопировала текст, выделите его здесь целиком, скопируйте и отправьте Зафару.</p>
+    </div>
+    <textarea id="report" class="report" readonly></textarea>
+  </section>
+</div>
+
+<div class="bar">
+  <div class="bar-in">
+    <div class="progress">
+      <div class="small"><b id="p-done">0</b> из <span id="p-total">0</span> строк проверено · <span id="p-ok">0</span> верно · <span id="p-bad">0</span> неверно</div>
+      <div class="track" aria-hidden="true"><i class="t-ok" id="t-ok"></i><i class="t-bad" id="t-bad"></i></div>
+    </div>
+    <div class="btns" style="align-items:center">
+      <span class="toast" id="toast" role="status"></span>
+      <button class="btn primary" id="copy" type="button">Скопировать ответ</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const TARIFFS = [{"n":1,"c":"Обои","o":"Шымкент","d":"Туркестан","v":"Фархад Шымкент","m":"slot","p":200,"x":null,"t":"за коробку","inf":false,"z":false},{"n":2,"c":"Обои","o":"Шымкент","d":"Туркестан","v":"Фархад Шымкент — целая фура (большая)","m":"vehicle","p":85000,"x":null,"t":"","inf":false,"z":false},{"n":3,"c":"Обои","o":"Шымкент","d":"Туркестан","v":"Толик и Бабыр Шымкент","m":"slot","p":800,"x":1000,"t":"свыше 3 мест — 800тг, до 3-х дороже","inf":false,"z":false},{"n":4,"c":"Обои","o":"Шымкент","d":"Туркестан","v":"Ринат «Жидкие обои» Шымкент","m":"slot","p":1000,"x":null,"t":"цена «от» — когда как, иногда поставщик сам оплачивает, иногда половину","inf":false,"z":false},{"n":5,"c":"Обои","o":"Алматы","d":"Туркестан","v":"Додик (Дима)","m":"slot","p":500,"x":null,"t":"за коробку","inf":false,"z":false},{"n":6,"c":"Обои","o":"Алматы","d":"Туркестан","v":"Алматы Автобус (вариант 1)","m":"slot","p":1000,"x":null,"t":"только 1 водитель забирает за эту цену","inf":false,"z":false},{"n":7,"c":"Обои","o":"Алматы","d":"Туркестан","v":"Алматы Автобус (вариант 2)","m":"slot","p":1500,"x":null,"t":"стандартная цена","inf":false,"z":false},{"n":8,"c":"Обои","o":"Атырау","d":"Туркестан","v":"Сентай Багаж","m":"slot","p":3000,"x":null,"t":"","inf":false,"z":false},{"n":9,"c":"Обои","o":"Кызылорда","d":"Туркестан","v":"Улболсын (автобус)","m":"slot","p":500,"x":null,"t":"цена плавает","inf":false,"z":false},{"n":10,"c":"Обои","o":"Кызылорда","d":"Туркестан","v":"Через алфард (Орда)","m":"slot","p":1500,"x":null,"t":"1 коробка или 1 рейс","inf":false,"z":false},{"n":11,"c":"Обои","o":"Кызылорда","d":"Туркестан","v":"Гульдана апа","m":"slot","p":500,"x":null,"t":"","inf":false,"z":false},{"n":12,"c":"Обои","o":null,"d":"Туркестан","v":"Яндекс Индрайвер","m":"trip","p":2000,"x":null,"t":"и выше — срочная отправка, любой город","inf":false,"z":false},{"n":13,"c":"Обои","o":"Шымкент (местно)","d":"Шымкент","v":"Фархад Шымкент","m":"slot","p":200,"x":null,"t":"за коробку","inf":false,"z":false},{"n":14,"c":"Обои","o":"Шымкент (местно)","d":"Шымкент","v":"Толик и Бабыр","m":"slot","p":800,"x":1000,"t":"до 3 коробок — 1000тг, свыше 3-х — 800тг","inf":false,"z":false},{"n":15,"c":"Обои","o":"Алматы","d":"Шымкент","v":"через автовокзал","m":"slot","p":1000,"x":null,"t":"","inf":false,"z":false},{"n":16,"c":"Обои","o":"Алматы","d":"Шымкент","v":"Маххабат","m":"slot","p":500,"x":null,"t":"","inf":false,"z":false},{"n":17,"c":"Обои","o":"Атырау","d":"Шымкент","v":null,"m":"slot","p":2500,"x":3000,"t":"практически не заказываем — дорого и долго ждать","inf":false,"z":false},{"n":18,"c":"Обои","o":"Кызылорда","d":"Шымкент","v":"через алфард (Орда)","m":"slot","p":2000,"x":null,"t":"","inf":false,"z":false},{"n":19,"c":"Обои","o":"Атырау","d":"Шымкент","v":"автобус","m":"slot","p":2500,"x":null,"t":"","inf":true,"z":true},{"n":20,"c":"Обои","o":"Атырау","d":"Кызылорда","v":"поезд (через проводника)","m":"slot","p":3000,"x":null,"t":"","inf":true,"z":true},{"n":21,"c":"Обои","o":"Атырау","d":"Туркестан","v":"поезд (багажом)","m":"slot","p":3000,"x":null,"t":"","inf":true,"z":true},{"n":22,"c":"Обои","o":"Атырау","d":"Туркестан","v":"газель (альтернатива)","m":"slot","p":1500,"x":2000,"t":"договорная — если едет газелью вместо указанного выше способа","inf":true,"z":true},{"n":23,"c":"Обои","o":"Атырау","d":"Шымкент","v":"газель (альтернатива)","m":"slot","p":1500,"x":2000,"t":"договорная — если едет газелью вместо автобуса","inf":true,"z":true},{"n":24,"c":"Обои","o":"Атырау","d":"Кызылорда","v":"газель (альтернатива)","m":"slot","p":1500,"x":2000,"t":"договорная — если едет газелью вместо поезда","inf":true,"z":true},{"n":25,"c":"ЛКМ","o":null,"d":"Туркестан","v":"Бобур (старекс)","m":"weight","p":400,"x":600,"t":"город перевозчика не указан в источнике — уточнить; зависит от объёма и количества","inf":false,"z":false,"q":"в Excel «за кг/шт». Мы поставили «за кг», но по сумме похоже на «за штуку»"},{"n":26,"c":"ЛКМ","o":"Шымкент","d":"Туркестан","v":"Фархад Шымкент","m":"weight","p":15,"x":null,"t":"за кг; либо 200-300тг за 1 место","inf":false,"z":false},{"n":27,"c":"ЛКМ","o":"Алматы","d":"Туркестан","v":"Додик (Дима)","m":"weight","p":25,"x":null,"t":"за кг; либо 500тг за место","inf":false,"z":false},{"n":28,"c":"ЛКМ","o":"Кызылорда","d":"Туркестан","v":"Гульдана апа","m":"weight","p":150,"x":500,"t":"от товара и объёма зависит","inf":false,"z":false,"q":"в Excel «за кг/шт». Мы поставили «за кг», но по сумме похоже на «за штуку»"},{"n":29,"c":"ЛКМ","o":"Шымкент (местно)","d":"Шымкент","v":"Бобур (старекс)","m":"weight","p":400,"x":600,"t":"","inf":false,"z":false,"q":"в Excel «за кг/шт». Мы поставили «за кг», но по сумме похоже на «за штуку»"},{"n":30,"c":"ЛКМ","o":"Шымкент (местно)","d":"Шымкент","v":"Фархад Шымкент","m":"weight","p":15,"x":null,"t":"200-300тг за 1 место","inf":false,"z":false},{"n":31,"c":"ЛКМ","o":"Алматы","d":"Шымкент","v":"Маххабат","m":"weight","p":500,"x":null,"t":"","inf":false,"z":false,"q":"в Excel «за кг/шт». Мы поставили «за кг», но по сумме похоже на «за штуку»"},{"n":32,"c":"ЛКМ","o":"Атырау","d":"Шымкент","v":null,"m":"weight","p":3000,"x":null,"t":"не заказываем — дорого и долго ждать","inf":false,"z":false,"q":"в Excel «за кг/шт». Мы поставили «за кг», но по сумме похоже на «за штуку»"},{"n":33,"c":"ЛКМ","o":"Кызылорда","d":"Шымкент","v":"через алфард (Орда)","m":"weight","p":1500,"x":2000,"t":"от объёма зависит, заказываем редко","inf":false,"z":false,"q":"в Excel «за кг/шт». Мы поставили «за кг», но по сумме похоже на «за штуку»"},{"n":34,"c":"ЛКМ","o":"Атырау","d":"Туркестан","v":null,"m":"slot","p":2500,"x":null,"t":"","inf":true,"z":false},{"n":35,"c":"ЛКМ","o":"Атырау","d":"Шымкент","v":null,"m":"slot","p":2500,"x":null,"t":"","inf":true,"z":false},{"n":36,"c":"ЛКМ","o":"Атырау","d":"Кызылорда","v":null,"m":"slot","p":2500,"x":null,"t":"","inf":true,"z":false},{"n":37,"c":"ПВА","o":"Шымкент","d":"Туркестан","v":"Фархад Шымкент","m":"slot","p":200,"x":null,"t":"за коробку","inf":false,"z":false},{"n":38,"c":"Галтель","o":"Шымкент","d":"Туркестан","v":"Фархад Шымкент","m":"slot","p":400,"x":null,"t":"за коробку","inf":false,"z":false},{"n":39,"c":"Молдинг","o":"Шымкент","d":"Туркестан","v":"Фархад Шымкент","m":"slot","p":400,"x":null,"t":"за коробку","inf":false,"z":false},{"n":40,"c":"Силикон","o":"Шымкент","d":"Туркестан","v":"Фархад Шымкент","m":"slot","p":200,"x":null,"t":"за коробку","inf":false,"z":false},{"n":41,"c":"Прочее","o":"Кызылорда","d":"Туркестан","v":"Гульдана апа","m":"slot","p":500,"x":1000,"t":"от товара и объёма зависит","inf":false,"z":false,"q":"в Excel «за коробку/кг». Мы поставили «за место»"},{"n":42,"c":"ПВА","o":"Шымкент (местно)","d":"Шымкент","v":"Фархад Шымкент","m":"slot","p":200,"x":null,"t":"","inf":false,"z":false},{"n":43,"c":"Галтель","o":"Шымкент (местно)","d":"Шымкент","v":"Фархад Шымкент","m":"slot","p":400,"x":null,"t":"","inf":false,"z":false},{"n":44,"c":"Молдинг","o":"Шымкент (местно)","d":"Шымкент","v":"Фархад Шымкент","m":"slot","p":400,"x":null,"t":"","inf":false,"z":false},{"n":45,"c":"Силикон","o":"Шымкент (местно)","d":"Шымкент","v":"Фархад Шымкент","m":"slot","p":200,"x":null,"t":"","inf":false,"z":false},{"n":46,"c":"Ламинат","o":"Шымкент","d":"Туркестан","v":"Фархад Шымкент","m":"weight","p":8000,"x":null,"t":"за тонну, если кубатура маленькая","inf":false,"z":false},{"n":47,"c":"Ламинат","o":"Шымкент","d":"Туркестан","v":"Фархад Шымкент","m":"pallet","p":200,"x":300,"t":"за пачку","inf":false,"z":false},{"n":48,"c":"Ламинат","o":"Шымкент","d":"Туркестан","v":"Рома Шымкент","m":"pallet","p":300,"x":400,"t":"за пачку","inf":false,"z":false},{"n":49,"c":"Ламинат","o":"Шымкент","d":"Туркестан","v":"Рома Шымкент","m":"weight","p":8000,"x":null,"t":"за тонну, если кубатура маленькая","inf":false,"z":false},{"n":50,"c":"Ламинат","o":"Кызылорда","d":"Туркестан","v":"Гульдана апа","m":"pallet","p":500,"x":700,"t":"от товара и объёма зависит","inf":false,"z":false},{"n":51,"c":"Ламинат","o":"Шымкент (местно)","d":"Шымкент","v":"Фархад Шымкент","m":"weight","p":8000,"x":null,"t":"за тонну, если кубатура маленькая","inf":false,"z":false},{"n":52,"c":"Ламинат","o":"Шымкент (местно)","d":"Шымкент","v":"Фархад Шымкент","m":"pallet","p":200,"x":300,"t":"за пачку","inf":false,"z":false},{"n":53,"c":"Ламинат","o":"Кызылорда","d":"Шымкент","v":"через алфард (Орда)","m":"pallet","p":2000,"x":null,"t":"практически не заказываем — логистика дорогая","inf":false,"z":false},{"n":54,"c":"Паркет","o":"Атырау","d":"Туркестан","v":"газель","m":"weight","p":50000,"x":70000,"t":"за тонну","inf":false,"z":false},{"n":55,"c":"Транспорт","o":"Алматы","d":"Кызылорда","v":"автобус","m":"slot","p":2500,"x":3000,"t":"цены меняются в зависимости от габаритов и веса","inf":true,"z":false},{"n":56,"c":"Транспорт","o":"Алматы","d":"Кызылорда","v":"Бастау (фура)","m":"slot","p":2000,"x":2500,"t":"","inf":true,"z":false},{"n":57,"c":"Транспорт","o":"Алматы","d":"Кызылорда","v":"полная газель","m":"vehicle","p":150000,"x":200000,"t":"","inf":false,"z":false},{"n":58,"c":"Транспорт","o":"Шымкент","d":"Кызылорда","v":"автобус","m":"slot","p":1500,"x":2000,"t":"","inf":true,"z":false},{"n":59,"c":"Транспорт","o":"Шымкент","d":"Кызылорда","v":"Бастау (фура)","m":"slot","p":500,"x":1000,"t":"","inf":true,"z":false},{"n":60,"c":"Транспорт","o":"Шымкент","d":"Кызылорда","v":"газель (догруз)","m":"slot","p":700,"x":1000,"t":"","inf":true,"z":false},{"n":61,"c":"Транспорт","o":"Шымкент","d":"Кызылорда","v":"полная газель","m":"vehicle","p":100000,"x":120000,"t":"","inf":false,"z":false},{"n":62,"c":"Транспорт","o":"Туркестан","d":"Кызылорда","v":"газель (догруз)","m":"slot","p":600,"x":800,"t":"","inf":true,"z":false},{"n":63,"c":"Транспорт","o":"Туркестан","d":"Кызылорда","v":"полная газель","m":"vehicle","p":70000,"x":85000,"t":"","inf":false,"z":false},{"n":64,"c":"Транспорт","o":"Шымкент","d":"Шиели","v":"такси","m":"slot","p":2500,"x":3000,"t":"","inf":true,"z":false},{"n":65,"c":"Транспорт","o":"Туркестан","d":"Шиели","v":"такси","m":"slot","p":2000,"x":2500,"t":"","inf":true,"z":false},{"n":66,"c":"Транспорт","o":"Кызылорда","d":"Шиели","v":"автобус","m":"slot","p":1000,"x":1500,"t":"","inf":true,"z":false},{"n":67,"c":"Транспорт","o":"Кызылорда","d":"Шиели","v":"такси","m":"slot","p":1500,"x":2000,"t":"","inf":true,"z":false},{"n":68,"c":"Транспорт","o":"Атырау","d":"Кызылорда","v":"газель (догруз)","m":"slot","p":1500,"x":2000,"t":"","inf":true,"z":false},{"n":69,"c":"Транспорт","o":"Атырау","d":"Кызылорда","v":"поезд","m":"slot","p":2500,"x":4000,"t":"","inf":true,"z":false}];
+
+// Те же правила, что в CRM (frontend/src/pages/NewRequestPage.tsx).
+const MISC = new Set(["ПВА", "Галтель", "Молдинг", "Силикон"]);
+const CARGO = {
+  "Обои": ["Обои"],
+  "Краски ЛКМ": ["ЛКМ"],
+  "Ламинат и паркет": ["Ламинат", "Паркет"],
+  "Прочие товары (ПВА, галтель, молдинг, силикон)": ["Прочее (крепёж/фурнитура)", "Прочее"],
+  "Керамогранит": [],
+};
+const FROM = ["Алматы", "Атырау", "Кызылорда", "Туркестан", "Шымкент"];
+const TO = ["Туркестан", "Шымкент", "Кызылорда", "Шиели", "Алматы", "Атырау"];
+const GROUPS = [
+  ["Обои", t => t.c === "Обои"],
+  ["Краски ЛКМ", t => t.c === "ЛКМ"],
+  ["Ламинат и паркет", t => t.c === "Ламинат" || t.c === "Паркет"],
+  ["Прочие товары", t => MISC.has(t.c) || t.c === "Прочее"],
+  ["Перевозки по маршруту (любой груз)", t => t.c === "Транспорт"],
+];
+const GAPS = [
+  { id: "g1", where: "лист «Туркестан», таблица «Атырау Логистика», строка «Прочии»", what: "Туркестан и Шымкент: «2м — 3500тг, 1м — 3000»", q: "Что это за груз и что значит «2м» и «1м»? Это метры, места или что-то другое?" },
+  { id: "g2", where: "там же, строка «Обой»", what: "Туркестан 2500 / Шымкент 2500 / Кызылорда 3000, способ доставки не подписан", q: "Чем везут и за что цена? Зафар сказал так: в Шымкент автобусом 2500, в Кызылорду поездом через проводника 3000, в Туркестан поездом багажом 3000. Эти варианты в списке выше уже есть. Эта строка про то же самое или про другое?" },
+  { id: "g3", where: "там же, строка «Атыру-Туркистан,Шым,Орда»", what: "Туркестан и Шымкент: «Тонна 50-70 мын», груз не указан", q: "Какой это груз? Любой товар по тоннажу? Каким транспортом везут?" },
+  { id: "g4", where: "лист «шымкент», «Прочие», строка «Через алфард Орда»", what: "цена 0, «Не заказываем»", q: "Правильно ли мы поняли, что этой перевозки нет и тариф не нужен?" },
+  { id: "g5", where: "лист «Туркестан», таблица «Атырау Логистика», строка «Паркет поезд»", what: "цена пустая", q: "Сколько стоит паркет поездом из Атырау и за что цена: за тонну, пачку или место?" },
+];
+const MISSING = [
+  { id: "m1", q: "Керамогранит. В Excel нет ни одной отдельной цены, CRM считает только по общей таблице маршрутов (в Кызылорду и Шиели). Как и почём возите керамогранит, особенно в Туркестан и Шымкент? За что цена: за м², за паллету или за тонну?" },
+  { id: "m2", q: "Доставка В Алматы и В Атырау. В Excel эти города есть только как «откуда». Бывает ли, что товар везут туда? Кто везёт и почём?" },
+  { id: "m3", q: "Обратные маршруты: например, из Туркестана в Шымкент или из Кызылорды в Алматы. Цена такая же, как в обратную сторону, или другая?" },
+  { id: "m4", q: "Что-то ещё, чего в Excel нет: другие перевозчики, грузчики, новые цены." },
+];
+
+const KEY = "keremet-tariff-check-v1";
+let S = { who: "", rows: {}, gaps: {}, miss: {}, log: [], filter: "all", calc: { cargo: "Обои", from: "Шымкент", to: "Туркестан", pick: null, qty: "5" } };
+try { const raw = localStorage.getItem(KEY); if (raw) S = Object.assign(S, JSON.parse(raw)); } catch (e) {}
+let saveT;
+function save() { clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }, 300); }
+
+function h(tag, attrs, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v == null || v === false) continue;
+    if (k === "class") el.className = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (k === "value") el.value = v;
+    else el.setAttribute(k, v === true ? "" : v);
+  }
+  for (const k of kids.flat()) if (k != null && k !== false) el.append(k instanceof Node ? k : String(k));
+  return el;
+}
+const money = n => Math.round(n).toLocaleString("ru-RU").replace(/ |,/g, " ") + " ₸";
+const range = t => t.x && t.x !== t.p ? money(t.p).replace(" ₸", "") + "–" + money(t.x) : money(t.p);
+function unit(t) {
+  switch (t.m) {
+    case "slot": return { qty: true, label: "Сколько мест / коробок", short: "мест", per: "за место" };
+    case "weight": return /тонн/.test(t.t) ? { qty: true, label: "Вес, тонн", short: "т", per: "за тонну" } : { qty: true, label: "Вес, кг", short: "кг", per: "за кг" };
+    case "pallet": return { qty: true, label: "Сколько пачек / паллет", short: "шт", per: "за пачку" };
+    case "vehicle": return { qty: false, short: "машину", per: "за машину целиком" };
+    default: return { qty: false, short: "поездку", per: "за поездку" };
+  }
+}
+function calc(t, qty) {
+  const u = unit(t), p = t.p, x = t.x || t.p;
+  if (!u.qty) return { min: p, max: x, formula: "фиксированная цена " + u.per };
+  if (!qty || qty <= 0) return null;
+  const th = /свыше\s*(\d+)/.exec(t.t || "");
+  if (th && x !== p) {
+    const n = +th[1], up = qty > n ? p : x;
+    return { min: qty * up, max: qty * up, formula: `${qty} ${u.short} × ${money(up)} (${qty > n ? "свыше " + n : "до " + n})` };
+  }
+  return { min: qty * p, max: qty * x, formula: x !== p ? `${qty} ${u.short} × ${range(t)}` : `${qty} ${u.short} × ${money(p)}` };
+}
+const groupLabel = c => MISC.has(c) ? "Прочее (крепёж/фурнитура)" : c;
+const fromLabel = t => t.o || "город не указан";
+const cargoName = t => t.c === "Транспорт" ? "любой груз" : t.c;
+const who = t => t.v || "перевозчик не указан";
+const rowTitle = t => `№${t.n} ${cargoName(t)}, ${fromLabel(t)} → ${t.d}, ${who(t)}: ${range(t)} ${unit(t).per}`;
+
+/* ---------- калькулятор ---------- */
+function opts(sel, list, cur) { sel.replaceChildren(...list.map(v => h("option", { value: v, selected: v === cur }, v))); }
+const $ = id => document.getElementById(id);
+opts($("c-cargo"), Object.keys(CARGO), S.calc.cargo);
+opts($("c-from"), FROM, S.calc.from);
+opts($("c-to"), TO, S.calc.to);
+for (const [id, k] of [["c-cargo", "cargo"], ["c-from", "from"], ["c-to", "to"]]) {
+  $(id).addEventListener("change", e => { S.calc[k] = e.target.value; S.calc.pick = null; save(); renderCalc(); });
+}
+function matches() {
+  const { cargo, from, to } = S.calc, allowed = CARGO[cargo];
+  return TARIFFS.filter(t => {
+    if (t.d.toLowerCase() !== to.toLowerCase()) return false;
+    if (t.o && !t.o.toLowerCase().startsWith(from.toLowerCase())) return false;
+    if (t.c === "Транспорт") return true;
+    return allowed.includes(groupLabel(t.c));
+  });
+}
+function renderCalc() {
+  const body = $("c-body"), list = matches(), { cargo, from, to } = S.calc;
+  if (from === to && !list.length) { body.replaceChildren(h("div", { class: "empty" }, "Город отправки и получения совпадают. Для перевозок по городу выберите один и тот же город только там, где в Excel есть «местные» тарифы (сейчас только Шымкент).")); return; }
+  if (!list.length) {
+    const inp = h("input", { type: "text", id: "c-miss", placeholder: "Например: газелью, 1500 ₸ за место" });
+    body.replaceChildren(h("div", { class: "empty" },
+      h("p", {}, h("b", {}, `${cargo}: ${from} → ${to}. `), "В Excel нет тарифа по этому маршруту, поэтому CRM сумму не посчитает и сотрудник введёт её сам."),
+      h("label", { class: "field" }, h("span", {}, "Если вы так возите, напишите, кто везёт и сколько стоит"), inp),
+      h("div", { class: "btns" }, h("button", { class: "btn", type: "button", onclick: () => {
+        if (!inp.value.trim()) { inp.focus(); return; }
+        S.log.push({ kind: "missing", text: `Нет тарифа: ${cargo}, ${from} → ${to}`, note: inp.value.trim() }); save(); renderCalc(); renderLog(); renderBar();
+      } }, "Добавить в ответ"))));
+    return;
+  }
+  if (!list.some(t => t.n === S.calc.pick)) S.calc.pick = list[0].n;
+  const t = TARIFFS.find(t => t.n === S.calc.pick), u = unit(t);
+  const cards = list.map(x => {
+    const on = x.n === S.calc.pick;
+    return h("label", { class: "carrier" + (on ? " on" : "") },
+      h("input", { type: "radio", name: "carrier", checked: on, onchange: () => { S.calc.pick = x.n; save(); renderCalc(); } }),
+      h("div", {}, h("div", { class: "nm" }, who(x)),
+        h("div", { class: "chips" },
+          x.c === "Транспорт" ? h("span", { class: "chip info" }, "общий тариф маршрута, любой груз") : null,
+          !x.o ? h("span", { class: "chip info" }, "город отправки не указан") : null,
+          x.inf || x.q ? h("span", { class: "chip warn" }, "проверьте единицу") : null),
+        x.t ? h("div", { class: "small muted" }, x.t) : null),
+      h("div", { class: "price num" }, range(x), h("small", {}, unit(x).per)));
+  });
+  const qtyIn = h("input", { type: "number", id: "c-qty", min: "0", step: "any", inputmode: "decimal", value: S.calc.qty });
+  const res = h("div", { class: "result", id: "c-res" });
+  function paint() {
+    const r = calc(t, parseFloat(S.calc.qty));
+    if (!r) { res.replaceChildren(h("p", { class: "muted" }, "Введите количество, и сумма посчитается сама.")); return; }
+    const sum = r.min === r.max ? money(r.max) : `${money(r.min).replace(" ₸", "")}–${money(r.max)}`;
+    const note = h("input", { type: "text", id: "c-note", placeholder: "Если неверно: сколько вы платите на самом деле" });
+    const add = ok => { S.log.push({ kind: ok ? "ok" : "bad", text: `${cargo}, ${from} → ${to}, ${who(t)}${u.qty ? ", " + S.calc.qty + " " + u.short : ""} = ${sum}`, note: note.value.trim() }); save(); renderLog(); renderBar(); flash(ok ? "Записано: расчёт верный" : "Записано: расчёт неверный"); };
+    res.replaceChildren(
+      h("div", { class: "small muted" }, "Сумма заявки"),
+      h("div", { class: "sum num" }, sum),
+      h("div", { class: "formula num" }, r.formula),
+      r.min !== r.max ? h("p", { class: "small muted" }, `В Excel цена «от и до». В заявке CRM подставит верхнюю границу ${money(r.max)}. Больше этой суммы без объяснения причины заявку не пропустит.`)
+                      : h("p", { class: "small muted" }, `Больше ${money(r.max)} CRM без объяснения причины не пропустит.`),
+      h("label", { class: "field" }, h("span", {}, "Так вы и платите?"), note),
+      h("div", { class: "btns" },
+        h("button", { class: "btn", type: "button", onclick: () => add(true) }, "Верно, записать"),
+        h("button", { class: "btn", type: "button", onclick: () => add(false) }, "Неверно, записать")));
+  }
+  qtyIn.addEventListener("input", e => { S.calc.qty = e.target.value; save(); paint(); });
+  body.replaceChildren(h("div", { class: "carriers" }, h("h3", {}, `Кто везёт · найдено: ${list.length}`), cards),
+    u.qty ? h("label", { class: "qty field" }, h("span", {}, u.label), qtyIn) : null, res);
+  paint();
+}
+function renderLog() {
+  $("c-log-wrap").hidden = !S.log.length;
+  $("c-log").replaceChildren(...S.log.map((l, i) => h("li", {},
+    h("span", { class: "chip " + (l.kind === "ok" ? "ok" : l.kind === "bad" ? "bad" : "warn") }, l.kind === "ok" ? "верно" : l.kind === "bad" ? "неверно" : "нет тарифа"),
+    h("div", {}, l.text, l.note ? h("div", { class: "small muted" }, l.note) : null),
+    h("button", { type: "button", "aria-label": "Убрать", onclick: () => { S.log.splice(i, 1); save(); renderLog(); renderBar(); } }, "убрать"))));
+}
+
+/* ---------- список строк ---------- */
+const FILTERS = [["all", "Все"], ["todo", "Не проверены"], ["unit", "Проверьте единицу"], ["bad", "Неверно"]];
+function renderFilters() {
+  const n = { all: TARIFFS.length, todo: TARIFFS.filter(t => !S.rows[t.n]?.st).length, unit: TARIFFS.filter(t => t.inf || t.q).length, bad: TARIFFS.filter(t => S.rows[t.n]?.st === "bad").length };
+  $("filters").replaceChildren(...FILTERS.map(([k, l]) => h("button", { type: "button", class: S.filter === k ? "on" : "", "aria-pressed": String(S.filter === k), onclick: () => { S.filter = k; save(); renderFilters(); renderList(); } }, `${l} · ${n[k]}`)));
+}
+function visible(t) {
+  const st = S.rows[t.n]?.st;
+  if (S.filter === "todo") return !st;
+  if (S.filter === "unit") return t.inf || t.q;
+  if (S.filter === "bad") return st === "bad";
+  return true;
+}
+function rowEl(t) {
+  const r = S.rows[t.n] || {}, u = unit(t);
+  const cmt = h("textarea", { id: "cmt-" + t.n, placeholder: "Как правильно? Цена, единица, перевозчик, маршрут", value: r.cmt || "" });
+  cmt.addEventListener("input", e => { (S.rows[t.n] ||= {}).cmt = e.target.value; save(); });
+  const set = st => { const cur = S.rows[t.n] ||= {}; cur.st = cur.st === st ? null : st; save(); renderList(); renderFilters(); renderBar(); };
+  return h("div", { class: "row" + (r.st ? " st-" + r.st : "") },
+    h("div", { class: "row-top" },
+      h("div", {},
+        h("div", { class: "route" }, `№${t.n} · ${fromLabel(t)} → ${t.d}${t.c !== "Транспорт" && GROUPS.find(g => g[1](t))[0] !== t.c ? " · " + t.c : ""}`),
+        h("div", { class: "nm" }, who(t)),
+        t.t ? h("div", { class: "note" }, t.t) : null),
+      h("div", { class: "price num" }, range(t), h("small", {}, u.per))),
+    t.inf || t.q || t.z ? h("div", { class: "chips" },
+      t.inf ? h("span", { class: "chip warn" }, "в Excel не сказано, за что цена. Мы поставили «за место»") : null,
+      t.q ? h("span", { class: "chip warn" }, t.q) : null,
+      t.z ? h("span", { class: "chip info" }, "со слов Зафара, в Excel не так подробно") : null) : null,
+    h("div", { class: "btns" },
+      h("button", { type: "button", class: "btn ok" + (r.st === "ok" ? " on" : ""), "aria-pressed": String(r.st === "ok"), onclick: () => set("ok") }, "Верно"),
+      h("button", { type: "button", class: "btn bad" + (r.st === "bad" ? " on" : ""), "aria-pressed": String(r.st === "bad"), onclick: () => set("bad") }, "Неверно")),
+    r.st === "bad" ? cmt : null);
+}
+function renderList() {
+  const out = [];
+  for (const [name, fn] of GROUPS) {
+    const rows = TARIFFS.filter(t => fn(t) && visible(t));
+    if (!rows.length) continue;
+    out.push(h("div", { class: "group" }, h("h3", {}, `${name} · ${rows.length}`), rows.map(rowEl)));
+  }
+  if (!out.length) out.push(h("div", { class: "empty" }, S.filter === "bad" ? "Неверных строк пока нет." : "Все строки проверены."));
+  $("list").replaceChildren(...out);
+}
+
+/* ---------- вопросы ---------- */
+function qa(store, items, label) {
+  return items.map((g, i) => {
+    const ta = h("textarea", { id: g.id, placeholder: "Ваш ответ", value: S[store][g.id] || "" });
+    ta.addEventListener("input", e => { S[store][g.id] = e.target.value; save(); renderBar(); });
+    return h("div", { class: "gap-item" },
+      g.where ? h("div", { class: "src" }, h("b", {}, `${i + 1}. ${g.what}`), h("br"), g.where) : null,
+      h("p", {}, g.q), ta);
+  });
+}
+
+/* ---------- ответ ---------- */
+function report() {
+  const L = [], d = new Date().toLocaleDateString("ru-RU");
+  const st = TARIFFS.map(t => S.rows[t.n]?.st);
+  const ok = st.filter(s => s === "ok").length, bad = st.filter(s => s === "bad").length;
+  L.push("Проверка тарифов доставки КЕРЕМЕТ");
+  L.push(`Проверил(а): ${S.who.trim() || "имя не указано"} · ${d}`);
+  L.push(`Строк проверено: ${ok + bad} из ${TARIFFS.length} (верно ${ok}, неверно ${bad})`);
+  const bads = TARIFFS.filter(t => S.rows[t.n]?.st === "bad");
+  if (bads.length) { L.push("", "НЕВЕРНО:"); for (const t of bads) { L.push(rowTitle(t)); L.push("  → " + (S.rows[t.n].cmt?.trim() || "без комментария")); } }
+  const todo = TARIFFS.filter(t => !S.rows[t.n]?.st);
+  if (todo.length && todo.length < TARIFFS.length) L.push("", "Не проверены: №" + todo.map(t => t.n).join(", №"));
+  if (S.log.length) {
+    L.push("", "РАСЧЁТЫ В КАЛЬКУЛЯТОРЕ:");
+    for (const l of S.log) L.push(`${l.kind === "ok" ? "Верно" : l.kind === "bad" ? "Неверно" : "Нет тарифа"}: ${l.kind === "missing" ? l.text.replace("Нет тарифа: ", "") : l.text}${l.note ? " → " + l.note : ""}`);
+  }
+  const ga = GAPS.filter(g => S.gaps[g.id]?.trim());
+  if (ga.length) { L.push("", "НЕ ВНЕСЛИ, ОТВЕТЫ:"); for (const g of ga) L.push(`${GAPS.indexOf(g) + 1}. ${g.what} → ${S.gaps[g.id].trim()}`); }
+  const ma = MISSING.filter(g => S.miss[g.id]?.trim());
+  if (ma.length) { L.push("", "ЧЕГО НЕТ В EXCEL, ОТВЕТЫ:"); for (const g of ma) L.push(`${g.q.split(".")[0]} → ${S.miss[g.id].trim()}`); }
+  return L.join("\n");
+}
+function renderBar() {
+  const ok = TARIFFS.filter(t => S.rows[t.n]?.st === "ok").length, bad = TARIFFS.filter(t => S.rows[t.n]?.st === "bad").length, n = TARIFFS.length;
+  $("p-done").textContent = ok + bad; $("p-total").textContent = n; $("p-ok").textContent = ok; $("p-bad").textContent = bad;
+  $("t-ok").style.width = (ok / n * 100) + "%"; $("t-bad").style.width = (bad / n * 100) + "%";
+  if (!$("rep-panel").hidden) $("report").value = report();
+}
+let flashT;
+function flash(msg) { $("toast").textContent = msg; clearTimeout(flashT); flashT = setTimeout(() => { $("toast").textContent = ""; }, 2500); }
+$("copy").addEventListener("click", () => {
+  const text = report();
+  $("rep-panel").hidden = false; $("report").value = text;
+  const fallback = () => { $("rep-panel").scrollIntoView({ behavior: "smooth", block: "center" }); $("report").select(); flash("Выделите текст и скопируйте"); };
+  try { navigator.clipboard.writeText(text).then(() => flash("Скопировано. Отправьте Зафару в WhatsApp"), fallback); } catch (e) { fallback(); }
+});
+$("who").value = S.who;
+$("who").addEventListener("input", e => { S.who = e.target.value; save(); renderBar(); });
+
+$("total").textContent = TARIFFS.length + " строк";
+$("gaps").replaceChildren(...qa("gaps", GAPS));
+$("missing").replaceChildren(...qa("miss", MISSING));
+renderCalc(); renderLog(); renderFilters(); renderList(); renderBar();
+</script>
+
+</body>
+</html>
